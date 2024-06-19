@@ -1,44 +1,36 @@
 #!/usr/bin/env python3
 """
-mod doc
+Caching request module
 """
-
-
 import redis
 import requests
-from typing import Callable
 from functools import wraps
-
-# Initialize Redis client
-r = redis.Redis()
+from typing import Callable
 
 
-def cache_with_expiry(method: Callable) -> Callable:
-    @wraps(method)
+def track_get_page(fn: Callable) -> Callable:
+    """ Decorator for get_page
+    """
+    @wraps(fn)
     def wrapper(url: str) -> str:
-        # Generate cache keys
-        count_key = f"count:{url}"
-        cache_key = f"cached:{url}"
-
-        # Increment the access count
-        r.incr(count_key)
-
-        # Check if the content is cached
-        cached_content = r.get(cache_key)
-        if cached_content:
-            return cached_content.decode('utf-8')
-
-        # Fetch the page content
-        content = method(url)
-
-        # Cache the content with an expiry of 10 seconds
-        r.setex(cache_key, 10, content)
-
-        return content
+        """ Wrapper that:
+            - check whether a url's data is cached
+            - tracks how many times get_page is called
+        """
+        client = redis.Redis()
+        client.incr(f'count:{url}')
+        cached_page = client.get(f'{url}')
+        if cached_page:
+            return cached_page.decode('utf-8')
+        response = fn(url)
+        client.set(f'{url}', response, 10)
+        return response
     return wrapper
 
 
-@cache_with_expiry
+@track_get_page
 def get_page(url: str) -> str:
+    """ Makes a http request to a given endpoint
+    """
     response = requests.get(url)
     return response.text
