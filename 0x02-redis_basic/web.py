@@ -42,13 +42,3 @@ def cache_with_expiry(method: Callable) -> Callable:
 def get_page(url: str) -> str:
     response = requests.get(url)
     return response.text
-
-
-# Testing the functionality
-if __name__ == "__main__":
-    test_url = "http://slowwly.robertomurray.co.uk"
-    print(get_page(test_url))
-    print(get_page(test_url))
-
-    # Check access count
-    print(f"Access count: {r.get(f'count:{test_url}').decode('utf-8')}")
