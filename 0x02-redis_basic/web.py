@@ -1,44 +1,30 @@
 #!/usr/bin/env python3
-"""
-Caching request module
-"""
-
+""" get_page module get page of url"""
+from typing import Callable
+from functools import wraps
 import requests
 import redis
-from functools import wraps
-from typing import Callable
 
-# Initialize Redis connection
-redis_client = redis.Redis()
+redis = redis.Redis()
 
 
-def cache_response(func: Callable) -> Callable:
-    @wraps(func)
-    def wrapper(url: str) -> str:
-        cache_key = f"cache:{url}"
-        cached_response = redis_client.get(cache_key)
-        if cached_response:
-            return cached_response.decode('utf-8')
-
-        response = func(url)
-        redis_client.setex(cache_key, 10, response)
-        return response
-
+def count(method: Callable) -> Callable:
+    """ count the number of times a method is called """
+    @wraps(method)
+    def wrapper(url):
+        """ wrapper  of count """
+        redis.incr(f"count:{url}")
+        cached = redis.get(f"cached:{url}")
+        if cached:
+            return cached.decode('utf-8')
+        res = method(url)
+        redis.set(f"count:{url}", 0)
+        redis.setex(f"cached:{url}", 10, res)
+        return res
     return wrapper
 
 
-def track_access(func: Callable) -> Callable:
-    @wraps(func)
-    def wrapper(url: str) -> str:
-        count_key = f"count:{url}"
-        redis_client.incr(count_key)
-        return func(url)
-
-    return wrapper
-
-
-@cache_response
-@track_access
+@count
 def get_page(url: str) -> str:
-    response = requests.get(url)
-    return response.text
+    """ get page of url"""
+    return requests.get(url).text
